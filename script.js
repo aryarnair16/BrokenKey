@@ -159,7 +159,7 @@ function drawGraph() {
     if (idx === 0) chartCtx.moveTo(x, y);
     else chartCtx.lineTo(x, y);
   });
-  chartCtx.strokeStyle = '#d6ff35';
+  chartCtx.strokeStyle = '#14902fba';
   chartCtx.lineWidth = 2.5;
   chartCtx.stroke();
 
