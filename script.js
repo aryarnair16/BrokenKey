@@ -361,7 +361,7 @@ themeBtn.addEventListener('click', () => {
   themeBtn.innerHTML = document.body.classList.contains('light-mode')
     ? '☾ <span>Dark mode</span>'
     : '☼ <span>Light mode</span>';
-  resetTest();
+  
 });
 
 ghostBtn.addEventListener('click', () => {
