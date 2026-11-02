@@ -295,24 +295,36 @@ function startTimer() {
 }, 1000);
 }
 
+
 function finishTest() {
   if (timeLeft > 0) clearInterval(timer);
+
   timer = null;
   isTyping = false;
   inputEl.disabled = true;
   startBtn.disabled = false;
+
   statusEl.textContent = 'TEST COMPLETE';
+
   renderPassage();
   updateHeatmap();
   updateStats();
+
   const finalWPM = calculateWPM();
+  const finalAccuracy = calculateAccuracy();
+
   if (finalWPM > bestWPM) {
     bestWPM = finalWPM;
+
     localStorage.setItem('keyrush-best-wpm', bestWPM);
+    localStorage.setItem('keyrush-best-accuracy', finalAccuracy);
   }
+
   resultEl.classList.remove('hidden');
-  resultEl.textContent = `Test complete · ${finalWPM} WPM · ${mistakes} errors`;
+  resultEl.textContent =
+    `Test complete · ${finalWPM} WPM · ${mistakes} errors`;
 }
+
 
 function resetTest() {
   clearInterval(timer);

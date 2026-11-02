@@ -1,23 +1,97 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#08090a">
-  <title>Ghost Race — KeyRush</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ghost Mode — KeyRush</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main class="container">
-    <section class="test-panel error-page">
-      <div class="error-mark">✳</div>
-      <p class="eyebrow">KEYRUSH / GHOST RACE</p>
-      <h1>Feature not found</h1>
-      <p class="subtitle">Looks like this feature is still being built.</p>
-      <div class="error-code">ERROR 501 · NOT IMPLEMENTED</div>
-      <p class="error-copy">Ghost mode will allow you to race against a previously recorded typing session. For now, this feature is under active development.</p>
-      <a class="btn btn-primary back-link" href="index.html">← Back to KeyRush</a>
+  <main class="container ghost-container">
+
+    <header class="topbar">
+      <div class="brand-copy">
+        <h1>Ghost Mode</h1>
+        <p class="eyebrow">THINK YOU CAN WIN?</p>
+      </div>
+      <button id="theme-btn" class="icon-btn" type="button">
+        ☼ Light mode
+      </button>
+    </header>
+
+    <section class="test-panel">
+
+      <h2>Select Difficulty</h2>
+
+      <div class="difficulty-options">
+        <select id="difficulty">
+          <option value="beginner">Beginner</option>
+          <option value="intermediate">Intermediate</option>
+          <option value="advanced">Advanced</option>
+          <option value="personal-best">Personal Best</option>
+        </select>
+      </div>
+
+      <div class="ghost-panels">
+
+        <!-- Player Panel -->
+        <div class="typing-panel">
+          <h2>YOU</h2>
+
+          <div class="typing-stats">
+            <span>WPM: <strong id="player-wpm">0</strong></span>
+            <span>Accuracy: <strong id="player-accuracy">100%</strong></span>
+          </div>
+
+          <div id="player-passage" class="passage"></div>
+
+          <textarea
+            id="player-input"
+            class="typing-input"
+            placeholder="Start typing here..."
+            disabled
+            spellcheck="false"
+          ></textarea>
+
+          <p>Progress: <span id="player-progress">0%</span></p>
+        </div>
+
+        <!-- Ghost Panel -->
+        <div class="typing-panel">
+          <h2>GHOST</h2>
+
+          <div class="typing-stats">
+            <span>WPM: <strong id="ghost-wpm">0</strong></span>
+            <span>Accuracy: <strong id="ghost-accuracy">100%</strong></span>
+          </div>
+
+          <div id="ghost-passage" class="passage"></div>
+
+          <p>Progress: <span id="ghost-progress">0%</span></p>
+        </div>
+
+      </div>
+
+      <div class="controls">
+        <button id="start-ghost-btn" class="btn btn-primary">
+          TRY ME
+        </button>
+
+        <button id="reset-ghost-btn" class="btn btn-secondary">
+          Reset
+        </button>
+
+        <a href="index.html" class="btn btn-secondary">
+          Back to KeyRush
+        </a>
+      </div>
+
+      <div id="ghost-message" class="result hidden"></div>
+
     </section>
   </main>
+
+  <script src="ghost.js" defer></script>
 </body>
 </html>
