@@ -40,6 +40,7 @@ let ghostAttempts = 0;
 let ghostMistakes = 0;
 
 let running = false;
+let playerFinished = false;
 let ghostFinished = false;
 let simulationId = 0;
 
@@ -123,6 +124,20 @@ function calculateAccuracy(attempts, mistakes) {
     );
 }
 
+function updateCompletionMessage() {
+    if (playerFinished && ghostFinished) {
+        message.textContent = "Both you and the ghost completed the passage!";
+    } else if (playerFinished) {
+        message.textContent = "You completed the passage! Ghost is still typing.";
+    } else if (ghostFinished) {
+        message.textContent = "Ghost completed the passage! You can continue typing.";
+    } else {
+        return;
+    }
+
+    message.classList.remove("hidden");
+}
+
 // Update player display
 function updatePlayer() {
     const typed = playerInput.value;
@@ -153,11 +168,11 @@ if (typed.length < passage.length) {
     playerProgress.textContent =
         Math.round((typed.length / passage.length) * 100) + "%";
 
-    if (typed === passage) {
-        playerInput.disabled = true;
-        message.textContent = "You completed the passage!";
-        message.classList.remove("hidden");
-    }
+    if (typed === passage && !playerFinished) {
+    playerFinished = true;
+    playerInput.disabled = true;
+    updateCompletionMessage();
+}
 }
 
 // Player typing event
@@ -250,9 +265,7 @@ async function startGhost(id) {
 
     if (id === simulationId) {
     ghostFinished = true;
-
-    message.classList.remove("hidden");
-    message.textContent = "Ghost completed the passage!";
+    updateCompletionMessage();
 }
 }
 
@@ -292,6 +305,7 @@ function resetGame() {
     simulationId++;
 
     running = false;
+    playerFinished = false;
     ghostFinished = false;
 
     playerAttempts = 0;
