@@ -454,6 +454,26 @@ body.light-mode .ghost-container .btn-secondary {
     }
 }
 
+/* Paste warning - Dark mode */
+.paste-warning {
+    color: #ffad66;
+    font-size: 13px;
+    font-weight: 500;
+    margin-top: 8px;
+    text-align: center;
+    transition: color 0.3s ease;
+}
+
+/* Paste warning - Light mode */
+body.light-mode .paste-warning {
+    color: #c45b12;
+}
+
+/* Keep warning hidden until needed */
+.paste-warning[hidden] {
+    display: none;
+}
+
 /* ===== MATCH YOU AND GHOST PANELS ===== */
 
 /* Same panel design */

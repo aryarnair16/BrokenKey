@@ -7,6 +7,16 @@ const playerPassage = document.getElementById("player-passage");
 const ghostPassage = document.getElementById("ghost-passage");
 
 const playerInput = document.getElementById("player-input");
+const pasteWarning = document.createElement("p");
+
+pasteWarning.id = "paste-warning";
+pasteWarning.className = "paste-warning";
+pasteWarning.textContent =
+    "Pasting doesn't qualify you for a win. Type the full passage manually to complete the race.";
+
+pasteWarning.hidden = true;
+
+playerInput.insertAdjacentElement("afterend", pasteWarning);
 
 const playerWpm = document.getElementById("player-wpm");
 const playerAccuracy = document.getElementById("player-accuracy");
@@ -43,13 +53,17 @@ const passages = [
     "A journey of a thousand miles begins with a single step."
 ];
 
+let previousInputValue = "";
+let pendingInput = null;
+let pendingPaste = null;
+
 let passage = "";
 let startTime = 0;
 
 let playerAttempts = 0;
+let playerWpmAttempts = 0;
 let playerMistakes = 0;
-
-let pendingInput = null;
+let manualCompletionAttempts = 0;
 
 let ghostAttempts = 0;
 let ghostMistakes = 0;
@@ -171,14 +185,17 @@ if (typed.length < passage.length) {
 }
     const elapsed = Date.now() - startTime;
 
-    playerWpm.textContent = calculateWPM(playerAttempts, elapsed);
+    playerWpm.textContent = calculateWPM(playerWpmAttempts, elapsed);
     playerAccuracy.textContent =
         calculateAccuracy(playerAttempts, playerMistakes) + "%";
 
     playerProgress.textContent =
         Math.round((typed.length / passage.length) * 100) + "%";
 
-    if (typed === passage && !playerFinished) {
+    if (
+    typed === passage &&
+    manualCompletionAttempts >= passage.length
+) {
     playerFinished = true;
     playerFinishTime = Date.now() - startTime;
 
@@ -197,44 +214,178 @@ if (typed.length < passage.length) {
 }
 
 
+
+
 // ===== PLAYER ACCURACY TRACKING =====
 
+// Fallback: identify the changed portion if beforeinput
+// information is unavailable.
+function getInsertedChange(oldValue, newValue) {
+    let start = 0;
+
+    while (
+        start < oldValue.length &&
+        start < newValue.length &&
+        oldValue[start] === newValue[start]
+    ) {
+        start++;
+    }
+
+    let oldEnd = oldValue.length;
+    let newEnd = newValue.length;
+
+    while (
+        oldEnd > start &&
+        newEnd > start &&
+        oldValue[oldEnd - 1] === newValue[newEnd - 1]
+    ) {
+        oldEnd--;
+        newEnd--;
+    }
+
+    return {
+        index: start,
+        text: newValue.slice(start, newEnd)
+    };
+}
+
+// Record the selection and input type before an edit.
 playerInput.addEventListener("beforeinput", (event) => {
     pendingInput = {
-        oldValue: playerInput.value,
+        start: playerInput.selectionStart,
+        end: playerInput.selectionEnd,
+        inputType: event.inputType,
+        data: event.data
+    };
+
+    // Keep paste information only for a paste operation.
+    if (event.inputType !== "insertFromPaste") {
+        pendingPaste = null;
+    }
+});
+
+// Capture pasted text and the selection it replaces.
+playerInput.addEventListener("paste", (event) => {
+    pendingPaste = {
+        text: event.clipboardData.getData("text"),
         start: playerInput.selectionStart,
         end: playerInput.selectionEnd
     };
 });
 
+// Process the actual change after the browser updates the textarea.
 playerInput.addEventListener("input", () => {
-    if (!pendingInput) return;
+    const oldValue = previousInputValue;
+    const newValue = playerInput.value;
 
-    const { oldValue, start, end } = pendingInput;
-
-    const insertedLength =
-        playerInput.value.length -
-        (oldValue.length - (end - start));
-
-    const insertedText = playerInput.value.slice(
-        start,
-        start + insertedLength
-    );
-
-    for (let i = 0; i < insertedText.length; i++) {
-        playerAttempts++;
-
-        if (insertedText[i] !== passage[start + i]) {
-            playerMistakes++;
-        }
+    if (!running) {
+        previousInputValue = newValue;
+        pendingInput = null;
+        pendingPaste = null;
+        return;
     }
 
+    let insertedText = "";
+    let insertionIndex = 0;
+
+    const edit = pendingInput;
+
+    if (
+    edit &&
+    typeof edit.inputType === "string" &&
+    edit.inputType.startsWith("insert")
+) {
+        insertionIndex = edit.start;
+
+        const replacedLength = edit.end - edit.start;
+
+        const actualInsertedLength = Math.max(
+            0,
+            newValue.length -
+            (oldValue.length - replacedLength)
+        );
+
+        if (
+            edit.inputType === "insertFromPaste" &&
+            pendingPaste
+        ) {
+            insertedText = pendingPaste.text.slice(
+                0,
+                actualInsertedLength
+            );
+        } else if (typeof edit.data === "string") {
+            insertedText = edit.data.slice(
+                0,
+                actualInsertedLength
+            );
+        } else {
+            insertedText = getInsertedChange(
+                oldValue,
+                newValue
+            ).text;
+        }
+
+    } else if (
+        !edit &&
+        pendingPaste
+    ) {
+        insertionIndex = pendingPaste.start;
+
+        const actualInsertedLength = Math.max(
+            0,
+            newValue.length -
+            (oldValue.length -
+            (pendingPaste.end - pendingPaste.start))
+        );
+
+        insertedText = pendingPaste.text.slice(
+            0,
+            actualInsertedLength
+        );
+
+    } else if (!edit) {
+        const change = getInsertedChange(
+            oldValue,
+            newValue
+        );
+
+        insertionIndex = change.index;
+        insertedText = change.text;
+    }
+
+    // Identify whether this change came from pasting.
+const isPaste =
+    (edit && edit.inputType === "insertFromPaste") ||
+    (!edit && pendingPaste !== null);
+
+    if (isPaste) {
+    manualCompletionAttempts = 0;
+    pasteWarning.hidden = false;
+}
+
+// Count inserted characters for accuracy.
+// Only manually typed characters count towards WPM.
+for (let i = 0; i < insertedText.length; i++) {
+    playerAttempts++;
+
+    if (!isPaste) {
+    playerWpmAttempts++;
+    manualCompletionAttempts++;
+}
+
+    if (
+        insertedText[i] !== passage[insertionIndex + i]
+    ) {
+        playerMistakes++;
+    }
+}
+
+    previousInputValue = newValue;
     pendingInput = null;
+    pendingPaste = null;
 
     updatePlayer();
 });
-
-
 
 
 // Wait for a specified time
@@ -368,22 +519,20 @@ function startRaceTimer() {
         }
     }, 1000);
 }
-function calculateFinalScore(attempts, mistakes, elapsed) {
-    const wpm = calculateWPM(attempts, elapsed);
+function calculateFinalScore(
+    wpmAttempts,
+    accuracyAttempts,
+    mistakes,
+    elapsed
+) {
+    const wpm = calculateWPM(wpmAttempts, elapsed);
+    const accuracy = calculateAccuracy(accuracyAttempts, mistakes);
 
-    const accuracy = attempts === 0
-        ? 0
-        : ((attempts - mistakes) / attempts) * 100;
-
-    const normalizedWpm = Math.min((wpm / targetWpm) * 100, 100);
+    const normalizedWpm = (wpm / targetWpm) * 100;
 
     const score = (0.70 * normalizedWpm) + (0.30 * accuracy);
 
-    return {
-        wpm,
-        accuracy,
-        score
-    };
+    return { wpm, accuracy, score };
 }
 
 function endRace() {
@@ -408,12 +557,19 @@ function endRace() {
     const ghostTime = ghostFinishTime ?? elapsed;
 
     const playerResult = calculateFinalScore(
-        playerAttempts, playerMistakes, playerTime
-    );
+    playerWpmAttempts,
+    playerAttempts,
+    playerMistakes,
+    playerTime
+);
+
 
     const ghostResult = calculateFinalScore(
-        ghostAttempts, ghostMistakes, ghostTime
-    );
+    ghostAttempts,
+    ghostAttempts,
+    ghostMistakes,
+    ghostTime
+);
 
     playerFinalWpm.textContent = playerResult.wpm;
     playerFinalAccuracy.textContent = playerResult.accuracy.toFixed(1) + "%";
@@ -468,7 +624,12 @@ function resetGame() {
 
     playerAttempts = 0;
     playerMistakes = 0;
+    playerWpmAttempts = 0;
+    manualCompletionAttempts = 0;
+    pasteWarning.hidden = true;
+    previousInputValue = "";
     pendingInput = null;
+    pendingPaste = null;
 
     ghostAttempts = 0;
     ghostMistakes = 0;
