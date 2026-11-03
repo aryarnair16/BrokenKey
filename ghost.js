@@ -196,42 +196,44 @@ if (typed.length < passage.length) {
 }
 }
 
+
+// ===== PLAYER ACCURACY TRACKING =====
+
 playerInput.addEventListener("beforeinput", (event) => {
-    if (!running || !event.inputType.startsWith("insert")) {
-        pendingInput = null;
-        return;
-    }
-
-    const insertedText =
-    event.data ??
-    event.dataTransfer?.getData("text/plain") ??
-    "";
-
     pendingInput = {
-        text: insertedText,
-        start: playerInput.selectionStart
+        oldValue: playerInput.value,
+        start: playerInput.selectionStart,
+        end: playerInput.selectionEnd
     };
 });
 
 playerInput.addEventListener("input", () => {
-    if (!running) return;
+    if (!pendingInput) return;
 
-    if (pendingInput) {
-        for (let i = 0; i < pendingInput.text.length; i++) {
-            playerAttempts++;
+    const { oldValue, start, end } = pendingInput;
 
-            if (
-                pendingInput.text[i] !==
-                passage[pendingInput.start + i]
-            ) {
-                playerMistakes++;
-            }
+    const insertedLength =
+        playerInput.value.length -
+        (oldValue.length - (end - start));
+
+    const insertedText = playerInput.value.slice(
+        start,
+        start + insertedLength
+    );
+
+    for (let i = 0; i < insertedText.length; i++) {
+        playerAttempts++;
+
+        if (insertedText[i] !== passage[start + i]) {
+            playerMistakes++;
         }
     }
 
     pendingInput = null;
+
     updatePlayer();
 });
+
 
 
 
@@ -273,7 +275,7 @@ async function startGhost(id) {
 
             await wait(250);
 
-            if (id !== simulationId) return;
+            if (id !== simulationId || !running) return;
         }
 
         // Correct character appears
