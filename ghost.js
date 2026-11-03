@@ -45,21 +45,52 @@ let simulationId = 0;
 
 // Difficulty settings
 
+
 const levels = {
     beginner: { wpm: 25, accuracy: 98 },
     intermediate: { wpm: 45, accuracy: 94 },
-    advanced: { wpm: 70, accuracy: 88 },
-
-    "personal-best": {
-        wpm: Math.min(
-            (Number(localStorage.getItem("keyrush-best-wpm")) || 25) * 0.85,
-            60
-        ),
-        accuracy:
-            Number(localStorage.getItem("keyrush-best-accuracy")) || 98
-    }
+    advanced: { wpm: 70, accuracy: 88 }
 };
 
+function getDifficultySettings() {
+    if (difficulty.value === "personal-best") {
+        const bestWPM = Number(
+            localStorage.getItem("keyrush-best-wpm")
+        );
+
+        const bestAccuracy = Number(
+            localStorage.getItem("keyrush-best-accuracy")
+        );
+
+        if (!bestWPM) return null;
+
+        return {
+            wpm: Math.min(bestWPM * 0.85, 60),
+            accuracy: bestAccuracy || 98
+        };
+    }
+
+    return levels[difficulty.value];
+}
+
+function updateDifficultySelection() {
+    const settings = getDifficultySettings();
+
+    if (!settings) {
+        message.textContent =
+            "No Personal Best record found. Complete a typing test first!";
+        message.classList.remove("hidden");
+        startBtn.disabled = true;
+    } else {
+        message.classList.add("hidden");
+
+        if (!running) {
+            startBtn.disabled = false;
+        }
+    }
+}
+
+difficulty.addEventListener("change", updateDifficultySelection);
 
 // Display passage as characters
 function renderPassage(element, text) {
@@ -162,7 +193,9 @@ function wait(ms) {
 
 // Ghost typing simulation
 async function startGhost(id) {
-    const settings = levels[difficulty.value];
+    const settings = getDifficultySettings();
+
+    if (!settings) return;
 
     const characters = ghostPassage.querySelectorAll(".char");
 
@@ -225,6 +258,11 @@ async function startGhost(id) {
 
 // Start Ghost Mode
 startBtn.addEventListener("click", () => {
+    if (!getDifficultySettings()) {
+        updateDifficultySelection();
+        return;
+    }
+
     resetGame();
 
     passage = passages[Math.floor(Math.random() * passages.length)];
@@ -283,6 +321,7 @@ function resetGame() {
 
     message.textContent = "";
     message.classList.add("hidden");
+    updateDifficultySelection();
 }
 
 // Reset button
@@ -297,3 +336,4 @@ themeBtn.addEventListener("click", () => {
             ? "☾ Dark mode"
             : "☼ Light mode";
 });
+updateDifficultySelection();
