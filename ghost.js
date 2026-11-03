@@ -63,7 +63,7 @@ let startTime = 0;
 let playerAttempts = 0;
 let playerWpmAttempts = 0;
 let playerMistakes = 0;
-let manualCompletionAttempts = 0;
+let playerManualCharacters = [];
 
 let ghostAttempts = 0;
 let ghostMistakes = 0;
@@ -154,12 +154,11 @@ function calculateWPM(attempts, elapsed) {
 
 // Calculate accuracy
 function calculateAccuracy(attempts, mistakes) {
-    if (attempts === 0) return 100;
+    if (attempts === 0) {
+        return 0;
+    }
 
-    return Math.max(
-        0,
-        Math.round(((attempts - mistakes) / attempts) * 100)
-    );
+    return ((attempts - mistakes) / attempts) * 100;
 }
 
 // Update player display
@@ -192,9 +191,13 @@ if (typed.length < passage.length) {
     playerProgress.textContent =
         Math.round((typed.length / passage.length) * 100) + "%";
 
-    if (
+    const entirePassageTypedManually =
+    playerManualCharacters.length === passage.length &&
+    playerManualCharacters.every(Boolean);
+
+if (
     typed === passage &&
-    manualCompletionAttempts >= passage.length
+    entirePassageTypedManually
 ) {
     playerFinished = true;
     playerFinishTime = Date.now() - startTime;
@@ -220,7 +223,7 @@ if (typed.length < passage.length) {
 
 // Fallback: identify the changed portion if beforeinput
 // information is unavailable.
-function getInsertedChange(oldValue, newValue) {
+function getTextChange(oldValue, newValue) {
     let start = 0;
 
     while (
@@ -245,6 +248,7 @@ function getInsertedChange(oldValue, newValue) {
 
     return {
         index: start,
+        removedLength: oldEnd - start,
         text: newValue.slice(start, newEnd)
     };
 }
@@ -285,100 +289,78 @@ playerInput.addEventListener("input", () => {
         return;
     }
 
-    let insertedText = "";
-    let insertionIndex = 0;
-
     const edit = pendingInput;
 
+    let change;
+
+    // Use the original selection for insertion and replacement.
     if (
-    edit &&
-    typeof edit.inputType === "string" &&
-    edit.inputType.startsWith("insert")
-) {
-        insertionIndex = edit.start;
-
-        const replacedLength = edit.end - edit.start;
-
-        const actualInsertedLength = Math.max(
-            0,
-            newValue.length -
-            (oldValue.length - replacedLength)
-        );
-
-        if (
-            edit.inputType === "insertFromPaste" &&
-            pendingPaste
-        ) {
-            insertedText = pendingPaste.text.slice(
-                0,
-                actualInsertedLength
-            );
-        } else if (typeof edit.data === "string") {
-            insertedText = edit.data.slice(
-                0,
-                actualInsertedLength
-            );
-        } else {
-            insertedText = getInsertedChange(
-                oldValue,
-                newValue
-            ).text;
-        }
-
-    } else if (
-        !edit &&
-        pendingPaste
+        edit &&
+        typeof edit.inputType === "string" &&
+        edit.inputType.startsWith("insert")
     ) {
-        insertionIndex = pendingPaste.start;
+        const removedLength = edit.end - edit.start;
 
-        const actualInsertedLength = Math.max(
+        const insertedLength = Math.max(
             0,
             newValue.length -
-            (oldValue.length -
-            (pendingPaste.end - pendingPaste.start))
+            (oldValue.length - removedLength)
         );
 
-        insertedText = pendingPaste.text.slice(
-            0,
-            actualInsertedLength
-        );
-
-    } else if (!edit) {
-        const change = getInsertedChange(
-            oldValue,
-            newValue
-        );
-
-        insertionIndex = change.index;
-        insertedText = change.text;
+        change = {
+            index: edit.start,
+            removedLength: removedLength,
+            text: newValue.slice(
+                edit.start,
+                edit.start + insertedLength
+            )
+        };
+    } else {
+        // Handle deletion and browser fallback.
+        change = getTextChange(oldValue, newValue);
     }
 
-    // Identify whether this change came from pasting.
-const isPaste =
-    (edit && edit.inputType === "insertFromPaste") ||
-    (!edit && pendingPaste !== null);
+    const insertedText = change.text;
+    const insertionIndex = change.index;
+
+    const isPaste =
+        (edit && edit.inputType === "insertFromPaste") ||
+        pendingPaste !== null;
 
     if (isPaste) {
-    manualCompletionAttempts = 0;
-    pasteWarning.hidden = false;
-}
-
-// Count inserted characters for accuracy.
-// Only manually typed characters count towards WPM.
-for (let i = 0; i < insertedText.length; i++) {
-    playerAttempts++;
-
-    if (!isPaste) {
-    playerWpmAttempts++;
-    manualCompletionAttempts++;
-}
-
-    if (
-        insertedText[i] !== passage[insertionIndex + i]
-    ) {
-        playerMistakes++;
+        pasteWarning.hidden = false;
     }
-}
+
+    // Only actual manual typing counts towards completion and WPM.
+    const isManualInsertion =
+        !isPaste &&
+        (
+            !edit ||
+            edit.inputType === "insertText" ||
+            edit.inputType === "insertCompositionText"
+        );
+
+    // Update the manual-origin tracking for the current input.
+    playerManualCharacters.splice(
+        change.index,
+        change.removedLength,
+        ...Array(insertedText.length).fill(isManualInsertion)
+    );
+
+    // Count inserted characters for accuracy and WPM.
+    for (let i = 0; i < insertedText.length; i++) {
+        playerAttempts++;
+
+        if (isManualInsertion) {
+            playerWpmAttempts++;
+        }
+
+        if (
+            insertedText[i] !== passage[insertionIndex + i]
+        ) {
+            playerMistakes++;
+        }
+    }
 
     previousInputValue = newValue;
     pendingInput = null;
@@ -528,7 +510,10 @@ function calculateFinalScore(
     const wpm = calculateWPM(wpmAttempts, elapsed);
     const accuracy = calculateAccuracy(accuracyAttempts, mistakes);
 
-    const normalizedWpm = (wpm / targetWpm) * 100;
+    const normalizedWpm = Math.min(
+    (wpm / targetWpm) * 100,
+    100
+);
 
     const score = (0.70 * normalizedWpm) + (0.30 * accuracy);
 
@@ -625,7 +610,7 @@ function resetGame() {
     playerAttempts = 0;
     playerMistakes = 0;
     playerWpmAttempts = 0;
-    manualCompletionAttempts = 0;
+    playerManualCharacters = [];
     pasteWarning.hidden = true;
     previousInputValue = "";
     pendingInput = null;
@@ -638,10 +623,11 @@ function resetGame() {
     playerInput.disabled = true;
 
     playerWpm.textContent = "0";
-    playerAccuracy.textContent = "100%";
+    playerAccuracy.textContent = "0%";
+
 
     ghostWpm.textContent = "0";
-    ghostAccuracy.textContent = "100%";
+    ghostAccuracy.textContent = "0%";
 
     playerProgress.textContent = "0%";
     ghostProgress.textContent = "0%";
