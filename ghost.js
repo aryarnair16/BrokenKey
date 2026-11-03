@@ -401,16 +401,17 @@ async function startGhost(id) {
         const makesMistake = Math.random() * 100 > settings.accuracy;
 
         if (makesMistake) {
-            ghostMistakes++;
+    ghostMistakes++;
 
-            characters[i].classList.add("wrong");
-            characters[i].textContent = "✕";
+    characters[i].classList.add("wrong");
+    characters[i].textContent = "✕";
 
-            await wait(250);
+    await wait(250);
 
-            if (id !== simulationId || !running) return;
-        }
+    if (id !== simulationId || !running) return;
 
+    ghostAttempts++; // Count the corrected character as another attempt
+}
         // Correct character appears
         characters[i].textContent = passage[i];
         characters[i].classList.remove("wrong");
