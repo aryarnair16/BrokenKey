@@ -495,3 +495,221 @@ body.light-mode .typing-panel:nth-child(2) {
         border-left-color: transparent;
     }
 }
+/* ===== GHOST RACE TIMER ===== */
+
+.race-timer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 18px;
+    background: linear-gradient(145deg, #20183f, #11102d);
+    border: 1px solid #a78bff;
+    border-radius: 14px;
+    box-shadow: 0 0 15px rgba(167, 139, 255, 0.2);
+    color: #e5e1ff;
+}
+
+.race-timer::before {
+    content: "👻";
+    font-size: 23px;
+}
+
+.race-timer strong {
+    font-size: 25px;
+    color: #ff922e;
+    text-shadow: 0 0 10px rgba(255, 146, 46, 0.6);
+    font-variant-numeric: tabular-nums;
+}
+
+.race-timer span {
+    font: 700 0.65rem ui-monospace, monospace;
+    letter-spacing: 1px;
+    color: #b5a2ff;
+}
+
+body.light-mode .race-timer {
+    background: #fff8f0;
+    border-color: #ff9b43;
+    box-shadow: 0 0 10px rgba(255, 155, 67, 0.15);
+}
+
+body.light-mode .race-timer span {
+    color: #75549c;
+}
+
+/* ===== GHOST MODE RULES ===== */
+
+.ghost-rules {
+    position: relative;
+    max-width: 800px;
+    margin: 30px auto;
+    padding: 25px;
+    border: 1px solid rgba(160, 120, 255, 0.35);
+    border-radius: 18px;
+    background: linear-gradient(
+        135deg,
+        rgba(35, 25, 65, 0.95),
+        rgba(15, 15, 35, 0.95)
+    );
+    box-shadow: 0 0 20px rgba(130, 80, 255, 0.15);
+    overflow: hidden;
+}
+
+.ghost-rules::before {
+    content: "👻";
+    position: absolute;
+    right: 20px;
+    top: 15px;
+    font-size: 90px;
+    opacity: 0.07;
+    pointer-events: none;
+}
+
+.rules-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 22px;
+}
+
+.ghost-icon {
+    font-size: 38px;
+    filter: drop-shadow(0 0 8px #a78bfa);
+}
+
+.rules-header h2 {
+    margin: 0;
+    color: #c4b5fd;
+}
+
+.rules-header p {
+    margin: 5px 0 0;
+    color: #aaa;
+    font-size: 14px;
+}
+
+.rules-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 25px;
+}
+
+.rule-group {
+    padding: 15px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.rule-group h3 {
+    color: #c4b5fd;
+    margin-top: 0;
+}
+
+.rule-group ul {
+    padding-left: 20px;
+    margin-bottom: 0;
+}
+
+.rule-group li {
+    color: #ddd;
+    margin-bottom: 10px;
+    line-height: 1.5;
+}
+
+@media (max-width: 600px) {
+    .rules-content {
+        grid-template-columns: 1fr;
+    }
+
+    .ghost-rules {
+        margin: 20px 10px;
+        padding: 18px;
+    }
+}
+/* ===== RULES POPUP ===== */
+
+.rules-btn {
+    display: block;
+    margin: 15px auto;
+    padding: 10px 22px;
+    border: 1px solid #a78bfa;
+    border-radius: 8px;
+    background: transparent;
+    color: #c4b5fd;
+    cursor: pointer;
+}
+
+.rules-modal[hidden] {
+    display: none;
+}
+
+.rules-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.75);
+}
+
+.rules-modal-content {
+    width: 100%;
+    max-width: 550px;
+    padding: 25px;
+    border: 1px solid rgba(160, 120, 255, 0.4);
+    border-radius: 16px;
+    background: #19152b;
+    color: #ddd;
+    box-shadow: 0 0 25px rgba(130, 80, 255, 0.2);
+}
+
+.rules-modal-content h2 {
+    color: #c4b5fd;
+    text-align: center;
+    margin-top: 0;
+}
+
+.rules-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.rule-group {
+    padding: 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.rule-group h3 {
+    color: #c4b5fd;
+}
+
+.rule-group li {
+    margin-bottom: 10px;
+    line-height: 1.5;
+}
+
+#close-rules-btn {
+    display: block;
+    margin: 20px auto 0;
+    padding: 10px 25px;
+    border: none;
+    border-radius: 8px;
+    background: #8060c9;
+    color: white;
+    cursor: pointer;
+}
+
+@media (max-width: 600px) {
+    .rules-content {
+        grid-template-columns: 1fr;
+    }
+
+    .rules-modal-content {
+        max-height: 85vh;
+        overflow-y: auto;
+    }
+}
