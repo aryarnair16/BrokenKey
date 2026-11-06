@@ -434,6 +434,7 @@ async function startGhost(id) {
     }
 
     if (id === simulationId && running) {
+        
     ghostFinished = true;
     ghostFinishTime = Date.now() - startTime;
 
