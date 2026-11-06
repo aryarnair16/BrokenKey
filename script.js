@@ -38,6 +38,8 @@ let currentPassage = '',
   timeLeft = 30,
   timeLimit = 30,
   startTime = null;
+  let testState = 'READY';   // 'READY' | 'RUNNING' | 'COMPLETED'
+let finishTimeout = null;
 
 let bestWPM = (typeof localStorage !== 'undefined' && Number(localStorage.getItem('keyrush-best-wpm'))) || 0;
 if (bestEl) bestEl.textContent = bestWPM;
@@ -345,6 +347,7 @@ function handleKeyDown(event) {
 
 function handleInput(event) {
   const typed = inputEl.value;
+  if (testState === 'READY' && !isTyping && typed.length > 0) startTest();
   const wasPasted = Boolean(
     isPasting ||
     (event && (event.inputType === 'insertFromPaste' || event.inputType === 'insertReplacementText')) ||
@@ -448,7 +451,16 @@ function updateStats() {
   timeEl.innerHTML = `${timeLeft}<span class="unit">s</span>`;
 }
 
+function startTest() {
+  if (testState !== 'READY') return;   // guarantees one start per test
+  testState = 'RUNNING';
+  inputEl.disabled = false;
+  startBtn.disabled = true;
+  startTimer();
+}
+
 function startTimer() {
+  clearInterval(timer);
   isTyping = true;
   startTime = Date.now();
   sessionReplayEvents = [{ t: 0, val: '', cursor: 0, wpm: 0, errors: 0 }];
@@ -461,7 +473,7 @@ function startTimer() {
     if (timeLeft <= 0) {
         timeLeft = 0;
         clearInterval(timer);
-        setTimeout(finishTest, 120);
+        finishTimeout = setTimeout(finishTest, 120);   // changed
     }
     timeEl.innerHTML = `${timeLeft}<span class="unit">s</span>`;
     wpmEl.textContent = calculateWPM();
@@ -471,7 +483,11 @@ function startTimer() {
 
 
 function finishTest() {
-  if (timeLeft > 0) clearInterval(timer);
+ if (testState === 'COMPLETED') return;   // results only once
+testState = 'COMPLETED';
+clearInterval(timer);
+clearTimeout(finishTimeout);
+finishTimeout = null;
 
   timer = null;
   isTyping = false;
@@ -532,6 +548,9 @@ function finishTest() {
 
 function resetTest() {
   clearInterval(timer);
+  clearTimeout(finishTimeout);
+finishTimeout = null;
+testState = 'READY';
   timer = null;
   isTyping = false;
   isPasting = false;
@@ -543,7 +562,7 @@ function resetTest() {
   correctTyped = 0;
   timeLeft = timeLimit;
   inputEl.value = '';
-  inputEl.disabled = true;
+  inputEl.disabled = false;
   charStates = new Array(currentPassage.length).fill('');
   resultEl.classList.add('hidden');
   statusEl.textContent = 'READY WHEN YOU ARE';
@@ -559,13 +578,10 @@ function resetTest() {
 
 if (startBtn) {
   startBtn.addEventListener('click', () => {
-    if (isTyping) return;
-    if (inputEl) {
-      inputEl.disabled = false;
-      inputEl.focus();
-    }
-    startBtn.disabled = true;
-    if (!timer) startTimer();
+    if (testState === 'COMPLETED') resetTest();
+    if (testState !== 'READY') return;
+    startTest();
+    if (inputEl) inputEl.focus();
   });
 }
 
@@ -1661,6 +1677,7 @@ if (typeof module !== 'undefined' && module.exports) {
     handleKeyDown,
     handleInput,
     handlePaste,
+    startTest,
     getTestState: () => ({
       keyMistakes,
       keySubstitutions,
@@ -1670,6 +1687,7 @@ if (typeof module !== 'undefined' && module.exports) {
       correctTyped,
       totalTyped,
       isTyping,
+      testState,
       currentPassage,
       inputEl
     }),
