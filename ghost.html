@@ -137,6 +137,36 @@
   <p id="completion-status"></p>
   <p id="time-difference"></p>
 </div>
+
+<!-- Performance Analytics -->
+<section id="ghost-analytics" class="ghost-analytics">
+  <h2>📊 Performance Analytics</h2>
+  <p>Your Ghost Mode performance history</p>
+
+  <div class="analytics-stats">
+    <div>
+      <span>Best WPM</span>
+      <strong id="analytics-best-wpm">0</strong>
+    </div>
+
+    <div>
+      <span>Average WPM</span>
+      <strong id="analytics-average-wpm">0</strong>
+    </div>
+
+    <div>
+      <span>Races Played</span>
+      <strong id="analytics-races-played">0</strong>
+    </div>
+  </div>
+
+  <div class="analytics-chart-container">
+    <canvas id="performance-chart"
+            aria-label="Recent Ghost Mode WPM performance"
+            role="img"></canvas>
+  </div>
+</section>
+
  <!-- Rules Popup -->
 <div id="rules-modal" class="rules-modal" hidden>
     <div class="rules-modal-content"

@@ -1,22 +1,12 @@
 
 /* ===== GHOST MODE ===== */
 
-// Elements
+// ===== DOM ELEMENTS =====
+
 const difficulty = document.getElementById("difficulty");
 const playerPassage = document.getElementById("player-passage");
 const ghostPassage = document.getElementById("ghost-passage");
-
 const playerInput = document.getElementById("player-input");
-const pasteWarning = document.createElement("p");
-
-pasteWarning.id = "paste-warning";
-pasteWarning.className = "paste-warning";
-pasteWarning.textContent =
-    "Pasting doesn't qualify you for a win. Type the full passage manually to complete the race.";
-
-pasteWarning.hidden = true;
-
-playerInput.insertAdjacentElement("afterend", pasteWarning);
 
 const playerWpm = document.getElementById("player-wpm");
 const playerAccuracy = document.getElementById("player-accuracy");
@@ -31,6 +21,7 @@ const resetBtn = document.getElementById("reset-ghost-btn");
 const message = document.getElementById("ghost-message");
 const themeBtn = document.getElementById("theme-btn");
 const raceTimer = document.getElementById("race-timer");
+
 const raceResults = document.getElementById("race-results");
 const winnerHeading = document.getElementById("winner-heading");
 
@@ -45,13 +36,45 @@ const ghostFinalScore = document.getElementById("ghost-final-score");
 const completionStatus = document.getElementById("completion-status");
 const timeDifference = document.getElementById("time-difference");
 
-// Typing passages
+// Analytics elements
+const analyticsBestWpm = document.getElementById("analytics-best-wpm");
+const analyticsAverageWpm = document.getElementById("analytics-average-wpm");
+const analyticsRacesPlayed = document.getElementById("analytics-races-played");
+const performanceChart = document.getElementById("performance-chart");
+
+// Rules popup elements
+const rulesBtn = document.getElementById("rules-btn");
+const rulesModal = document.getElementById("rules-modal");
+const closeRulesBtn = document.getElementById("close-rules-btn");
+
+// Paste warning
+const pasteWarning = document.createElement("p");
+
+pasteWarning.id = "paste-warning";
+pasteWarning.className = "paste-warning";
+pasteWarning.textContent =
+    "Pasting doesn't qualify you for a win. Type the full passage manually to complete the race.";
+pasteWarning.hidden = true;
+
+playerInput.insertAdjacentElement("afterend", pasteWarning);
+
+
+// ===== GAME DATA =====
+
 const passages = [
     "Practice makes progress. Keep typing and improve your speed every day.",
     "Technology makes our lives easier and connects people around the world.",
     "Success comes from patience, practice and the determination to keep learning.",
     "A journey of a thousand miles begins with a single step."
 ];
+
+const levels = {
+    beginner: { wpm: 25, accuracy: 98 },
+    intermediate: { wpm: 45, accuracy: 94 },
+    advanced: { wpm: 70, accuracy: 88 }
+};
+
+const GHOST_HISTORY_KEY = "keyrush-ghost-history";
 
 let previousInputValue = "";
 let pendingInput = null;
@@ -78,18 +101,12 @@ let raceEnded = false;
 
 let playerFinishTime = null;
 let ghostFinishTime = null;
-let targetWpm = 0;
 
+let targetWpm = 0;
 let simulationId = 0;
 
-// Difficulty settings
 
-
-const levels = {
-    beginner: { wpm: 25, accuracy: 98 },
-    intermediate: { wpm: 45, accuracy: 94 },
-    advanced: { wpm: 70, accuracy: 88 }
-};
+// ===== DIFFICULTY SETTINGS =====
 
 function getDifficultySettings() {
     if (difficulty.value === "personal-best") {
@@ -109,7 +126,7 @@ function getDifficultySettings() {
         };
     }
 
-    return levels[difficulty.value];
+    return levels[difficulty.value] || null;
 }
 
 function updateDifficultySelection() {
@@ -131,7 +148,9 @@ function updateDifficultySelection() {
 
 difficulty.addEventListener("change", updateDifficultySelection);
 
-// Display passage as characters
+
+// ===== PASSAGE DISPLAY =====
+
 function renderPassage(element, text) {
     element.innerHTML = "";
 
@@ -143,7 +162,9 @@ function renderPassage(element, text) {
     }
 }
 
-// Calculate WPM
+
+// ===== CALCULATIONS =====
+
 function calculateWPM(attempts, elapsed) {
     const minutes = elapsed / 60000;
 
@@ -152,39 +173,334 @@ function calculateWPM(attempts, elapsed) {
     return Math.round((attempts / 5) / minutes);
 }
 
-// Calculate accuracy
 function calculateAccuracy(attempts, mistakes) {
-    if (attempts === 0) {
-        return 0;
-    }
+    if (attempts === 0) return 0;
 
     return ((attempts - mistakes) / attempts) * 100;
 }
 
-// Update player display
+function calculateFinalScore(
+    wpmAttempts,
+    accuracyAttempts,
+    mistakes,
+    elapsed
+) {
+    const wpm = calculateWPM(wpmAttempts, elapsed);
+    const accuracy = calculateAccuracy(accuracyAttempts, mistakes);
+
+    const normalizedWpm = targetWpm > 0
+        ? Math.min((wpm / targetWpm) * 100, 100)
+        : 0;
+
+    const score = (0.70 * normalizedWpm) + (0.30 * accuracy);
+
+    return { wpm, accuracy, score };
+}
+
+
+// ===== PERFORMANCE ANALYTICS =====
+
+function getRaceHistory() {
+    try {
+        const history = JSON.parse(
+            localStorage.getItem(GHOST_HISTORY_KEY) || "[]"
+        );
+
+        if (!Array.isArray(history)) return [];
+
+        return history.filter(race =>
+            race &&
+            Number.isFinite(race.wpm) &&
+            Number.isFinite(race.accuracy) &&
+            Number.isFinite(race.score)
+        );
+    } catch {
+        return [];
+    }
+}
+
+function saveRaceResult(result) {
+    const history = getRaceHistory();
+
+    const raceRecord = {
+        wpm: result.wpm,
+        accuracy: result.accuracy,
+        score: result.score,
+        date: new Date().toISOString()
+    };
+
+    history.push(raceRecord);
+
+    try {
+        localStorage.setItem(
+            GHOST_HISTORY_KEY,
+            JSON.stringify(history.slice(-20))
+        );
+
+        const currentBestWpm =
+            Number(localStorage.getItem("keyrush-best-wpm")) || 0;
+
+        if (result.wpm > currentBestWpm) {
+            localStorage.setItem("keyrush-best-wpm", result.wpm);
+            localStorage.setItem(
+                "keyrush-best-accuracy",
+                result.accuracy
+            );
+        }
+    } catch (error) {
+        console.error("Could not save Ghost Mode history:", error);
+    }
+
+    updateAnalytics();
+}
+
+function updateAnalytics() {
+    const history = getRaceHistory();
+
+    const totalWpm = history.reduce(
+        (sum, race) => sum + race.wpm,
+        0
+    );
+
+    const averageWpm = history.length
+        ? Math.round(totalWpm / history.length)
+        : 0;
+
+    const bestWpm =
+        Number(localStorage.getItem("keyrush-best-wpm")) || 0;
+
+    analyticsBestWpm.textContent = bestWpm;
+    analyticsAverageWpm.textContent = averageWpm;
+    analyticsRacesPlayed.textContent = history.length;
+
+    drawPerformanceChart(history);
+}
+
+
+function drawPerformanceChart(history, liveWpm = null) {
+    const canvas = performanceChart;
+
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+
+    if (width <= 0 || height <= 0) return;
+
+    const isLightMode = document.body.classList.contains("light-mode");
+
+    // Theme colors
+    const axisColor = isLightMode ? "#475569" : "#94a3b8";
+    const textColor = isLightMode ? "#334155" : "#cbd5e1";
+    const gridColor = isLightMode
+        ? "rgba(15, 23, 42, 0.12)"
+        : "rgba(255, 255, 255, 0.12)";
+    const lineColor = isLightMode ? "#16a34a" : "#4ade80";
+
+    // Canvas resolution
+    const pixelRatio = window.devicePixelRatio || 1;
+
+    canvas.width = width * pixelRatio;
+    canvas.height = height * pixelRatio;
+
+    ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+
+    // Keep the last 9 completed races if a live race is being displayed
+    const completedRaces = liveWpm !== null && liveWpm > 0
+        ? history.slice(-9)
+        : history.slice(-10);
+
+    const points = completedRaces.map((race, index) => ({
+        raceNumber: history.length - completedRaces.length + index + 1,
+        wpm: race.wpm
+    }));
+
+    // Add temporary live race point
+    if (liveWpm !== null && liveWpm > 0) {
+        points.push({
+            raceNumber: history.length + 1,
+            wpm: liveWpm
+        });
+    }
+
+    if (points.length === 0) {
+        ctx.fillStyle = textColor;
+        ctx.font = "14px Arial";
+        ctx.textAlign = "center";
+
+        ctx.fillText(
+            "Complete a race to see your WPM history",
+            width / 2,
+            height / 2
+        );
+
+        return;
+    }
+
+    // Chart dimensions
+    const paddingLeft = 48;
+    const paddingRight = 18;
+    const paddingTop = 20;
+    const paddingBottom = 42;
+
+    const chartWidth = width - paddingLeft - paddingRight;
+    const chartHeight = height - paddingTop - paddingBottom;
+
+    const maxWpm = Math.max(
+        10,
+        Math.ceil(Math.max(...points.map(point => point.wpm)) / 10) * 10
+    );
+
+    // Draw horizontal gridlines and Y-axis labels
+    ctx.font = "11px Arial";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+
+    for (let i = 0; i <= 4; i++) {
+        const value = (maxWpm / 4) * i;
+        const y = paddingTop + chartHeight - (i / 4) * chartHeight;
+
+        ctx.strokeStyle = gridColor;
+        ctx.lineWidth = 1;
+
+        ctx.beginPath();
+        ctx.moveTo(paddingLeft, y);
+        ctx.lineTo(width - paddingRight, y);
+        ctx.stroke();
+
+        ctx.fillStyle = textColor;
+        ctx.fillText(Math.round(value), paddingLeft - 9, y);
+    }
+
+    // Draw chart axes
+    ctx.strokeStyle = axisColor;
+    ctx.lineWidth = 1.5;
+
+    ctx.beginPath();
+    ctx.moveTo(paddingLeft, paddingTop);
+    ctx.lineTo(paddingLeft, height - paddingBottom);
+    ctx.lineTo(width - paddingRight, height - paddingBottom);
+    ctx.stroke();
+
+    // Draw Y-axis title
+    ctx.save();
+    ctx.translate(12, paddingTop + chartHeight / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = textColor;
+    ctx.textAlign = "center";
+    ctx.font = "12px Arial";
+    ctx.fillText("WPM", 0, 0);
+    ctx.restore();
+
+    // Draw X-axis title
+    ctx.fillStyle = textColor;
+    ctx.textAlign = "center";
+    ctx.font = "12px Arial";
+    ctx.fillText(
+        "Race number",
+        paddingLeft + chartWidth / 2,
+        height - 5
+    );
+
+    // Calculate point positions
+    const getX = index => {
+        return paddingLeft + (
+            points.length === 1
+                ? chartWidth / 2
+                : (index / (points.length - 1)) * chartWidth
+        );
+    };
+
+    const getY = wpm => {
+        return paddingTop + chartHeight -
+            (wpm / maxWpm) * chartHeight;
+    };
+
+    // Draw WPM line
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+
+    points.forEach((point, index) => {
+        const x = getX(index);
+        const y = getY(point.wpm);
+
+        if (index === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+    });
+
+    ctx.stroke();
+
+    // Draw data points and race numbers
+    points.forEach((point, index) => {
+        const x = getX(index);
+        const y = getY(point.wpm);
+
+        ctx.fillStyle = lineColor;
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = textColor;
+        ctx.font = "11px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+
+        ctx.fillText(
+            point.raceNumber,
+            x,
+            height - paddingBottom + 8
+        );
+    });
+}
+
+
+
+// ===== PLAYER DISPLAY =====
+
 function updatePlayer() {
     const typed = playerInput.value;
     const characters = playerPassage.querySelectorAll(".char");
 
     characters.forEach((span, index) => {
-    span.classList.remove("correct", "wrong", "current");
+        span.classList.remove("correct", "wrong", "current");
 
-    if (index < typed.length) {
-        if (typed[index] === passage[index]) {
-            span.classList.add("correct");
-        } else {
-            span.classList.add("wrong");
+        if (index < typed.length) {
+            if (typed[index] === passage[index]) {
+                span.classList.add("correct");
+            } else {
+                span.classList.add("wrong");
+            }
         }
-    }
-});
+    });
 
-// Show cursor at the next character
-if (typed.length < passage.length) {
-    characters[typed.length].classList.add("current");
-}
+    // Show cursor at the next character
+    if (typed.length < passage.length) {
+        characters[typed.length].classList.add("current");
+    }
+
     const elapsed = Date.now() - startTime;
 
-    playerWpm.textContent = calculateWPM(playerWpmAttempts, elapsed);
+    playerWpm.textContent = calculateWPM(
+        playerWpmAttempts,
+        elapsed
+    );
+
+    // Update graph with temporary live race performance
+    if (running && playerAttempts > 0) {
+        drawPerformanceChart(
+            getRaceHistory(),
+            calculateWPM(playerWpmAttempts, elapsed)
+        );
+    }
+
     playerAccuracy.textContent =
         calculateAccuracy(playerAttempts, playerMistakes) + "%";
 
@@ -192,37 +508,33 @@ if (typed.length < passage.length) {
         Math.round((typed.length / passage.length) * 100) + "%";
 
     const entirePassageTypedManually =
-    playerManualCharacters.length === passage.length &&
-    playerManualCharacters.every(Boolean);
+        playerManualCharacters.length === passage.length &&
+        playerManualCharacters.every(Boolean);
 
-if (
-    typed === passage &&
-    entirePassageTypedManually
-) {
-    playerFinished = true;
-    playerFinishTime = Date.now() - startTime;
+    if (
+        typed === passage &&
+        entirePassageTypedManually
+    ) {
+        playerFinished = true;
+        playerFinishTime = Date.now() - startTime;
 
-    playerInput.disabled = true;
+        playerInput.disabled = true;
 
-    message.textContent = ghostFinished
-    ? "Both you and the ghost completed the passage!"
-    : "You completed the passage! Ghost is still typing.";
+        message.textContent = ghostFinished
+            ? "Both you and the ghost completed the passage!"
+            : "You completed the passage! Ghost is still typing.";
 
-    message.classList.remove("hidden");
+        message.classList.remove("hidden");
 
-    if (ghostFinished) {
-        endRace();
+        if (ghostFinished) {
+            endRace();
+        }
     }
 }
-}
-
-
 
 
 // ===== PLAYER ACCURACY TRACKING =====
 
-// Fallback: identify the changed portion if beforeinput
-// information is unavailable.
 function getTextChange(oldValue, newValue) {
     let start = 0;
 
@@ -253,7 +565,7 @@ function getTextChange(oldValue, newValue) {
     };
 }
 
-// Record the selection and input type before an edit.
+// Record selection and input type before editing
 playerInput.addEventListener("beforeinput", (event) => {
     pendingInput = {
         start: playerInput.selectionStart,
@@ -262,13 +574,12 @@ playerInput.addEventListener("beforeinput", (event) => {
         data: event.data
     };
 
-    // Keep paste information only for a paste operation.
     if (event.inputType !== "insertFromPaste") {
         pendingPaste = null;
     }
 });
 
-// Capture pasted text and the selection it replaces.
+// Capture pasted text
 playerInput.addEventListener("paste", (event) => {
     pendingPaste = {
         text: event.clipboardData.getData("text"),
@@ -277,7 +588,7 @@ playerInput.addEventListener("paste", (event) => {
     };
 });
 
-// Process the actual change after the browser updates the textarea.
+// Process actual input
 playerInput.addEventListener("input", () => {
     const oldValue = previousInputValue;
     const newValue = playerInput.value;
@@ -293,7 +604,6 @@ playerInput.addEventListener("input", () => {
 
     let change;
 
-    // Use the original selection for insertion and replacement.
     if (
         edit &&
         typeof edit.inputType === "string" &&
@@ -309,14 +619,13 @@ playerInput.addEventListener("input", () => {
 
         change = {
             index: edit.start,
-            removedLength: removedLength,
+            removedLength,
             text: newValue.slice(
                 edit.start,
                 edit.start + insertedLength
             )
         };
     } else {
-        // Handle deletion and browser fallback.
         change = getTextChange(oldValue, newValue);
     }
 
@@ -331,7 +640,6 @@ playerInput.addEventListener("input", () => {
         pasteWarning.hidden = false;
     }
 
-    // Only actual manual typing counts towards completion and WPM.
     const isManualInsertion =
         !isPaste &&
         (
@@ -340,14 +648,14 @@ playerInput.addEventListener("input", () => {
             edit.inputType === "insertCompositionText"
         );
 
-    // Update the manual-origin tracking for the current input.
+    // Track whether each character was typed manually
     playerManualCharacters.splice(
         change.index,
         change.removedLength,
         ...Array(insertedText.length).fill(isManualInsertion)
     );
 
-    // Count inserted characters for accuracy and WPM.
+    // Count inserted characters
     for (let i = 0; i < insertedText.length; i++) {
         playerAttempts++;
 
@@ -370,12 +678,12 @@ playerInput.addEventListener("input", () => {
 });
 
 
-// Wait for a specified time
+// ===== GHOST TYPING SIMULATION =====
+
 function wait(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Ghost typing simulation
 async function startGhost(id) {
     const settings = getDifficultySettings();
 
@@ -384,10 +692,8 @@ async function startGhost(id) {
     const characters = ghostPassage.querySelectorAll(".char");
 
     for (let i = 0; i < passage.length; i++) {
+        if (id !== simulationId || !running) return;
 
-       if (id !== simulationId || !running) return;
-
-        // Calculate typing delay from target WPM
         const baseDelay = 60000 / (settings.wpm * 5);
         const delay = baseDelay * (0.85 + Math.random() * 0.3);
 
@@ -398,34 +704,43 @@ async function startGhost(id) {
         ghostAttempts++;
 
         // Simulate an occasional typing mistake
-        const makesMistake = Math.random() * 100 > settings.accuracy;
+        const makesMistake =
+            Math.random() * 100 > settings.accuracy;
 
         if (makesMistake) {
-    ghostMistakes++;
+            ghostMistakes++;
 
-    characters[i].classList.add("wrong");
-    characters[i].textContent = "✕";
+            characters[i].classList.add("wrong");
+            characters[i].textContent = "✕";
 
-    await wait(250);
+            await wait(250);
 
-    if (id !== simulationId || !running) return;
+            if (id !== simulationId || !running) return;
 
-    ghostAttempts++; // Count the corrected character as another attempt
-}
+            ghostAttempts++;
+        }
+
         // Correct character appears
         characters[i].textContent = passage[i];
         characters[i].classList.remove("wrong");
         characters[i].classList.add("correct");
+
         // Move ghost cursor forward
-        characters.forEach(char => char.classList.remove("current"));
+        characters.forEach(char =>
+            char.classList.remove("current")
+        );
 
         if (i + 1 < passage.length) {
-    characters[i + 1].classList.add("current");
+            characters[i + 1].classList.add("current");
         }
 
         const elapsed = Date.now() - startTime;
 
-        ghostWpm.textContent = calculateWPM(ghostAttempts, elapsed);
+        ghostWpm.textContent = calculateWPM(
+            ghostAttempts,
+            elapsed
+        );
+
         ghostAccuracy.textContent =
             calculateAccuracy(ghostAttempts, ghostMistakes) + "%";
 
@@ -434,22 +749,24 @@ async function startGhost(id) {
     }
 
     if (id === simulationId && running) {
-    ghostFinished = true;
-    ghostFinishTime = Date.now() - startTime;
+        ghostFinished = true;
+        ghostFinishTime = Date.now() - startTime;
 
-    message.classList.remove("hidden");
+        message.classList.remove("hidden");
 
-    message.textContent = playerFinished
-    ? "Both you and the ghost completed the passage!"
-    : "Ghost completed the passage! You can continue typing.";  
+        message.textContent = playerFinished
+            ? "Both you and the ghost completed the passage!"
+            : "Ghost completed the passage! You can continue typing.";
 
-    if (playerFinished) {
-        endRace();
+        if (playerFinished) {
+            endRace();
+        }
     }
 }
-}
 
-// Start Ghost Mode
+
+// ===== START RACE =====
+
 startBtn.addEventListener("click", () => {
     const settings = getDifficultySettings();
 
@@ -460,7 +777,10 @@ startBtn.addEventListener("click", () => {
 
     resetGame();
 
-    passage = passages[Math.floor(Math.random() * passages.length)];
+    passage = passages[
+        Math.floor(Math.random() * passages.length)
+    ];
+
     playerInput.maxLength = passage.length;
 
     renderPassage(playerPassage, passage);
@@ -487,6 +807,9 @@ startBtn.addEventListener("click", () => {
     startGhost(currentId);
 });
 
+
+// ===== RACE TIMER =====
+
 function startRaceTimer() {
     timeLeft = 30;
     raceTimer.textContent = timeLeft;
@@ -502,27 +825,12 @@ function startRaceTimer() {
         }
     }, 1000);
 }
-function calculateFinalScore(
-    wpmAttempts,
-    accuracyAttempts,
-    mistakes,
-    elapsed
-) {
-    const wpm = calculateWPM(wpmAttempts, elapsed);
-    const accuracy = calculateAccuracy(accuracyAttempts, mistakes);
 
-    const normalizedWpm = Math.min(
-    (wpm / targetWpm) * 100,
-    100
-);
 
-    const score = (0.70 * normalizedWpm) + (0.30 * accuracy);
-
-    return { wpm, accuracy, score };
-}
+// ===== END RACE =====
 
 function endRace() {
-    if (raceEnded) return;
+    if (raceEnded || !running) return;
 
     raceEnded = true;
     running = false;
@@ -530,7 +838,7 @@ function endRace() {
     clearInterval(timerInterval);
     timerInterval = null;
 
-    // Stop any remaining ghost typing
+    // Stop remaining ghost typing
     simulationId++;
 
     playerInput.disabled = true;
@@ -543,53 +851,69 @@ function endRace() {
     const ghostTime = ghostFinishTime ?? elapsed;
 
     const playerResult = calculateFinalScore(
-    playerWpmAttempts,
-    playerAttempts,
-    playerMistakes,
-    playerTime
-);
-
+        playerWpmAttempts,
+        playerAttempts,
+        playerMistakes,
+        playerTime
+    );
 
     const ghostResult = calculateFinalScore(
-    ghostAttempts,
-    ghostAttempts,
-    ghostMistakes,
-    ghostTime
-);
+        ghostAttempts,
+        ghostAttempts,
+        ghostMistakes,
+        ghostTime
+    );
 
+    // Save player's completed race
+    saveRaceResult(playerResult);
+
+    // Display player results
     playerFinalWpm.textContent = playerResult.wpm;
-    playerFinalAccuracy.textContent = playerResult.accuracy.toFixed(1) + "%";
-    playerFinalScore.textContent = playerResult.score.toFixed(2);
+    playerFinalAccuracy.textContent =
+        playerResult.accuracy.toFixed(1) + "%";
+    playerFinalScore.textContent =
+        playerResult.score.toFixed(2);
 
+    // Display ghost results
     ghostFinalWpm.textContent = ghostResult.wpm;
-    ghostFinalAccuracy.textContent = ghostResult.accuracy.toFixed(1) + "%";
-    ghostFinalScore.textContent = ghostResult.score.toFixed(2);
+    ghostFinalAccuracy.textContent =
+        ghostResult.accuracy.toFixed(1) + "%";
+    ghostFinalScore.textContent =
+        ghostResult.score.toFixed(2);
 
+    // Determine winner
     if (playerFinished && !ghostFinished) {
-    winnerHeading.textContent = "YOU WIN!";
-} else if (ghostFinished && !playerFinished) {
-    winnerHeading.textContent = "GHOST WINS!";
-} else if (playerResult.score > ghostResult.score) {
-    winnerHeading.textContent = "YOU WIN!";
-} else if (ghostResult.score > playerResult.score) {
-    winnerHeading.textContent = "GHOST WINS!";
-} else {
-    winnerHeading.textContent = "IT'S A DRAW!";
-}
+        winnerHeading.textContent = "YOU WIN!";
+    } else if (ghostFinished && !playerFinished) {
+        winnerHeading.textContent = "GHOST WINS!";
+    } else if (playerResult.score > ghostResult.score) {
+        winnerHeading.textContent = "YOU WIN!";
+    } else if (ghostResult.score > playerResult.score) {
+        winnerHeading.textContent = "GHOST WINS!";
+    } else {
+        winnerHeading.textContent = "IT'S A DRAW!";
+    }
 
+    // Completion time difference
     if (playerFinished && ghostFinished) {
-    completionStatus.textContent =
-        "Completion time difference: " +
-        (Math.abs(playerFinishTime - ghostFinishTime) / 1000).toFixed(2) +
-        " seconds";
-} else {
-    completionStatus.textContent = "";
-}
+        completionStatus.textContent =
+            "Completion time difference: " +
+            (
+                Math.abs(playerFinishTime - ghostFinishTime) / 1000
+            ).toFixed(2) +
+            " seconds";
+    } else {
+        completionStatus.textContent = "";
+    }
 
-timeDifference.textContent = "";
+    timeDifference.textContent = "";
+
     raceResults.classList.remove("hidden");
 }
-// Reset game
+
+
+// ===== RESET GAME =====
+
 function resetGame() {
     simulationId++;
 
@@ -612,7 +936,9 @@ function resetGame() {
     playerMistakes = 0;
     playerWpmAttempts = 0;
     playerManualCharacters = [];
+
     pasteWarning.hidden = true;
+
     previousInputValue = "";
     pendingInput = null;
     pendingPaste = null;
@@ -625,7 +951,6 @@ function resetGame() {
 
     playerWpm.textContent = "0";
     playerAccuracy.textContent = "0%";
-
 
     ghostWpm.textContent = "0";
     ghostAccuracy.textContent = "0%";
@@ -650,7 +975,9 @@ function resetGame() {
 // Reset button
 resetBtn.addEventListener("click", resetGame);
 
-// Theme toggle
+
+// ===== THEME TOGGLE =====
+
 themeBtn.addEventListener("click", () => {
     document.body.classList.toggle("light-mode");
 
@@ -658,13 +985,13 @@ themeBtn.addEventListener("click", () => {
         document.body.classList.contains("light-mode")
             ? "☾ Dark mode"
             : "☼ Light mode";
-});
-updateDifficultySelection();
-// ===== RULES POPUP =====
 
-const rulesBtn = document.getElementById("rules-btn");
-const rulesModal = document.getElementById("rules-modal");
-const closeRulesBtn = document.getElementById("close-rules-btn");
+    // Redraw graph using the current theme colors
+    updateAnalytics();
+});
+
+
+// ===== RULES POPUP =====
 
 rulesBtn.addEventListener("click", () => {
     rulesModal.hidden = false;
@@ -691,3 +1018,9 @@ document.addEventListener("keydown", (event) => {
         rulesBtn.focus();
     }
 });
+
+
+// ===== INITIALIZATION =====
+
+updateDifficultySelection();
+updateAnalytics();
